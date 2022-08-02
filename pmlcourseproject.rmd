@@ -1,0 +1,158 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Vicky C"
+date: '2022-08-02'
+output: html_document
+---
+
+## Synopsis
+
+In this project, the goal is to use data from accelerometers on the belt, forearm, arm, and dumbbell of 6 participants to create a prediction model that will be used to predict 20 different test cases.
+
+## Data Processing
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, results= 'hide'}
+
+library(knitr)
+library(ggplot2)
+library(caret)
+library(rpart.plot)
+library(rattle)
+library(gbm)
+
+pml_training <- read.csv("C:/Users/VickyCastro/Downloads/pml-training.csv", na.strings= c("NA","","#DIV/0!"))
+pml_testing <- read.csv("C:/Users/VickyCastro/Downloads/pml-testing.csv", na.strings= c("NA","","#DIV/0!"))
+
+```
+
+Remove all NA and blank values and then remove all unnecessary variables for each dataset.
+
+```{r}
+pml_training <- pml_training[,colSums(is.na(pml_training)) == 0]
+dim(pml_training)
+
+pml_testing <- pml_testing[,colSums(is.na(pml_testing)) == 0]
+dim(pml_testing)
+
+pml_training <- pml_training[,-c(1:7)]
+dim(pml_training)
+
+pml_testing <- pml_testing[,-c(1:7)]
+dim(pml_testing)
+
+```
+
+## Building Model and Using Cross Validation
+Split the training data into two so that only can be used to train the model and the second can be used as a validation set.
+
+```{r}
+
+training_set <- createDataPartition(pml_training$classe, p = 0.6, list = FALSE)
+newTrain <- pml_training[training_set,]
+newTest <- pml_training[-training_set,]
+
+dim(newTrain)
+dim(newTest)
+
+```
+
+Create a control by using the k-fold cross validation process.
+
+```{r}
+
+control <- trainControl(method="cv", number=3)
+
+```
+
+We will now use three methods to build a model: Decision Trees, Random Forests, and Generalized Boosted Model.
+
+### Decision Trees
+
+First, we will build a decision tree model using the newTrain data.
+
+```{r}
+set.seed(1234)
+DT_model <- train(classe~., data=newTrain, method="rpart", trControl=control)
+fancyRpartPlot(DT_model$finalModel)
+
+```
+
+We will use the validation "newTest" data to see the accuracy of the decision tree model using a confusion matrix.
+
+```{r}
+newTest$classe <- as.factor(newTest$classe)
+
+DT_predict <- predict(DT_model, newdata = newTest)
+DT_matrix <- confusionMatrix(newTest$classe, DT_predict)
+
+DT_matrix
+
+```
+
+The accuracy of this model is 0.563 and our out of sample error is 0.44 which means this is not a very good predictor of class.
+
+### Random Forests
+
+First, we will build the random forest model using the newTrain data.
+
+```{r}
+set.seed(1234)
+RF_model <- train(classe~., data=newTrain, method="rf", trControl=control, verbose = FALSE)
+plot(RF_model, main = "Accuracy of the RF Model")
+
+```
+
+We will use the validation "newTest" data to see the accuracy of the random forest model using a confusion matrix.
+
+```{r}
+
+RF_predict <- predict(RF_model, newdata = newTest)
+RF_matrix <- confusionMatrix(newTest$classe, RF_predict)
+
+RF_matrix
+
+```
+
+The accuracy of this model is 0.994 and our out of sample error is 0.01 which means this is a very good predictor of class.
+
+### Generalized Boosted Model
+
+First, we will build the Generalized Boosted Model using the newTrain data.
+
+```{r}
+set.seed(1234)
+GBM_model <- train(classe~., data=newTrain, method="gbm", trControl=control, verbose=FALSE)
+plot(GBM_model)
+
+```
+
+We will use the validation "newTest" data to see the accuracy of the GBM using a confusion matrix.
+
+```{r}
+
+GBM_predict <- predict(GBM_model, newdata = newTest)
+GBM_matrix <- confusionMatrix(newTest$classe, GBM_predict)
+
+GBM_matrix
+
+```
+
+The accuracy of this model is 0.9648 and our out of sample error is 0.035 which is a very good predictor of class, but not as good as the random forest model.
+
+## Results
+
+After comparing the accuracy of each model, the random forest model is the best model to accurately predict the class outcome. Therefore, we will run this model against the original test set (pml_testing).
+
+```{r}
+
+predictTestSet <- predict(RF_model, pml_testing)
+print(predictTestSet)
+
+```
+
+
+
